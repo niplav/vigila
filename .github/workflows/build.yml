@@ -13,8 +13,8 @@ jobs:
       with:
         python-version: '3.11'
     - run: pip install pygame pyinstaller
-    - run: pyinstaller --onefile --windowed vigila.py
+    - run: pyinstaller --onefile --windowed main.py
     - uses: actions/upload-artifact@v4
       with:
-        name: vigila-${{ matrix.os }}
+        name: main-${{ matrix.os }}
         path: dist/*
