@@ -1,5 +1,6 @@
 import pygame
 import sys
+from pvt import run_pvt
 
 # Initialize pygame
 pygame.init()
@@ -39,8 +40,12 @@ def main():
     # Button properties
     button_width = 200
     button_height = 60
-    button_x = SCREEN_WIDTH // 2 - button_width // 2
-    button_y = SCREEN_HEIGHT // 2 - button_height // 2
+    start_button_x = SCREEN_WIDTH // 2 - button_width // 2
+    start_button_y = SCREEN_HEIGHT // 2 - button_height // 2
+
+    # Exit button properties
+    exit_button_x = SCREEN_WIDTH // 2 - button_width // 2
+    exit_button_y = SCREEN_HEIGHT // 2 + button_height + 20
 
     while running:
         for event in pygame.event.get():
@@ -50,10 +55,17 @@ def main():
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left mouse button
                     mouse_pos = pygame.mouse.get_pos()
-                    button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
-                    if button_rect.collidepoint(mouse_pos):
-                        print("Start button clicked!")
-                        # TODO: Navigate to test selection or first test
+                    start_button_rect = pygame.Rect(start_button_x, start_button_y, button_width, button_height)
+                    exit_button_rect = pygame.Rect(exit_button_x, exit_button_y, button_width, button_height)
+
+                    if start_button_rect.collidepoint(mouse_pos):
+                        print("Starting Psychomotor Vigilance Task...")
+                        reaction_times = run_pvt(screen, font)
+                        print(f"PVT completed. Reaction times: {reaction_times}")
+                        print(f"Average reaction time: {sum(reaction_times)/len(reaction_times):.1f}ms" if reaction_times else "No data collected")
+
+                    elif exit_button_rect.collidepoint(mouse_pos):
+                        running = False
 
         # Fill screen with white background
         screen.fill(WHITE)
@@ -73,7 +85,10 @@ def main():
         screen.blit(subtitle_text, subtitle_rect)
 
         # Draw start button
-        draw_button(screen, "Start", button_x, button_y, button_width, button_height, BLUE, WHITE)
+        draw_button(screen, "Start PVT", start_button_x, start_button_y, button_width, button_height, BLUE, WHITE)
+
+        # Draw exit button
+        draw_button(screen, "Exit", exit_button_x, exit_button_y, button_width, button_height, GRAY, WHITE)
 
         # Update display
         pygame.display.flip()

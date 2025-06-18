@@ -18,3 +18,6 @@ jobs:
       with:
         name: main-${{ matrix.os }}
         path: dist/*
+    - name: Sign (ad-hoc)
+      if: runner.os == 'macOS'
+      run: codesign -s - dist/main
