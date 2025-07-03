@@ -18,6 +18,8 @@ class PsychomotorVigilanceTask:
         self.stimulus_start_time = 0
         self.stimulus_shown = False
         self.wait_start_time = 0
+        self.false_starts = []
+        self.all_responses = []
 
         # Colors
         self.WHITE = (255, 255, 255)
@@ -26,7 +28,7 @@ class PsychomotorVigilanceTask:
         self.GREEN = (0, 255, 0)
 
         # Stimulus wait time (2-10 seconds)
-        self.next_stimulus_delay = random.uniform(2.0, 10.0)
+        self.next_stimulus_delay = random.uniform(2.0, 6.0)
 
     def run(self):
         clock = pygame.time.Clock()
@@ -40,21 +42,40 @@ class PsychomotorVigilanceTask:
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
+                        current_time = time.time()
+
                         if self.stimulus_shown:
                             # Calculate reaction time
-                            reaction_time = (time.time() - self.stimulus_start_time) * 1000
+                            reaction_time = (current_time - self.stimulus_start_time) * 1000
                             self.reaction_times.append(reaction_time)
+                            self.all_responses.append({
+                                'trial': self.trial_count + 1,
+                                'type': 'correct',
+                                'reaction_time_ms': reaction_time,
+                                'timestamp': current_time
+                            })
                             self.trial_count += 1
 
                             # Reset for next trial
                             self.stimulus_shown = False
                             self.waiting_for_stimulus = False
-                            self.next_stimulus_delay = random.uniform(2.0, 10.0)
-                            self.wait_start_time = time.time()
+                            self.next_stimulus_delay = random.uniform(2.0, 6.0)
+                            self.wait_start_time = current_time
 
-                        elif not self.waiting_for_stimulus:
-                            # Premature response
-                            pass
+                        else:
+                            # Premature response (false start)
+                            false_start_time = current_time - self.wait_start_time
+                            self.false_starts.append(false_start_time * 1000)
+                            self.all_responses.append({
+                                'trial': self.trial_count + 1,
+                                'type': 'false_start',
+                                'time_since_wait_start_ms': false_start_time * 1000,
+                                'timestamp': current_time
+                            })
+
+                            # Reset wait time for this trial
+                            self.wait_start_time = current_time
+                            self.next_stimulus_delay = random.uniform(2.0, 6.0)
 
                     elif event.key == pygame.K_ESCAPE:
                         self.running = False
@@ -75,7 +96,7 @@ class PsychomotorVigilanceTask:
         return self.reaction_times
 
     def save_data(self):
-        if not self.reaction_times:
+        if not self.reaction_times and not self.false_starts:
             return
 
         # Create data directory if it doesn't exist
@@ -91,12 +112,21 @@ class PsychomotorVigilanceTask:
         data = {
             "test_type": "psychomotor_vigilance_task",
             "timestamp": datetime.now().isoformat(),
-            "trial_count": len(self.reaction_times),
+            "completed_trials": len(self.reaction_times),
+            "false_starts": len(self.false_starts),
+            "total_responses": len(self.all_responses),
             "reaction_times_ms": self.reaction_times,
-            "mean_rt_ms": sum(self.reaction_times) / len(self.reaction_times),
-            "min_rt_ms": min(self.reaction_times),
-            "max_rt_ms": max(self.reaction_times)
+            "false_start_times_ms": self.false_starts,
+            "all_responses": self.all_responses
         }
+
+        # Add statistics for valid reaction times
+        if self.reaction_times:
+            data.update({
+                "mean_rt_ms": sum(self.reaction_times) / len(self.reaction_times),
+                "min_rt_ms": min(self.reaction_times),
+                "max_rt_ms": max(self.reaction_times)
+            })
 
         # Save to file
         with open(filepath, 'w') as f:

@@ -1,0 +1,107 @@
+{
+  "test_type": "psychomotor_vigilance_task",
+  "timestamp": "2025-07-03T22:27:39.259040",
+  "completed_trials": 10,
+  "false_starts": 3,
+  "total_responses": 13,
+  "reaction_times_ms": [
+    386.4915370941162,
+    338.0270004272461,
+    629.2850971221924,
+    516.2336826324463,
+    741.9755458831787,
+    356.370210647583,
+    272.4113464355469,
+    242.67077445983887,
+    513.3745670318604,
+    308.4688186645508
+  ],
+  "false_start_times_ms": [
+    3957.988977432251,
+    2532.557487487793,
+    4195.212364196777
+  ],
+  "all_responses": [
+    {
+      "trial": 1,
+      "type": "correct",
+      "reaction_time_ms": 386.4915370941162,
+      "timestamp": 1751574402.6030474
+    },
+    {
+      "trial": 2,
+      "type": "false_start",
+      "time_since_wait_start_ms": 3957.988977432251,
+      "timestamp": 1751574406.5610363
+    },
+    {
+      "trial": 2,
+      "type": "correct",
+      "reaction_time_ms": 338.0270004272461,
+      "timestamp": 1751574411.145369
+    },
+    {
+      "trial": 3,
+      "type": "correct",
+      "reaction_time_ms": 629.2850971221924,
+      "timestamp": 1751574417.2554352
+    },
+    {
+      "trial": 4,
+      "type": "false_start",
+      "time_since_wait_start_ms": 2532.557487487793,
+      "timestamp": 1751574419.7879927
+    },
+    {
+      "trial": 4,
+      "type": "correct",
+      "reaction_time_ms": 516.2336826324463,
+      "timestamp": 1751574423.6002254
+    },
+    {
+      "trial": 5,
+      "type": "correct",
+      "reaction_time_ms": 741.9755458831787,
+      "timestamp": 1751574429.3787205
+    },
+    {
+      "trial": 6,
+      "type": "correct",
+      "reaction_time_ms": 356.370210647583,
+      "timestamp": 1751574433.191673
+    },
+    {
+      "trial": 7,
+      "type": "correct",
+      "reaction_time_ms": 272.4113464355469,
+      "timestamp": 1751574437.1905055
+    },
+    {
+      "trial": 8,
+      "type": "false_start",
+      "time_since_wait_start_ms": 4195.212364196777,
+      "timestamp": 1751574441.3857179
+    },
+    {
+      "trial": 8,
+      "type": "correct",
+      "reaction_time_ms": 242.67077445983887,
+      "timestamp": 1751574447.4242435
+    },
+    {
+      "trial": 9,
+      "type": "correct",
+      "reaction_time_ms": 513.3745670318604,
+      "timestamp": 1751574453.6447518
+    },
+    {
+      "trial": 10,
+      "type": "correct",
+      "reaction_time_ms": 308.4688186645508,
+      "timestamp": 1751574459.242573
+    }
+  ],
+  "mean_rt_ms": 430.53085803985596,
+  "min_rt_ms": 242.67077445983887,
+  "max_rt_ms": 741.9755458831787
+}
