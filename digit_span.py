@@ -1,9 +1,7 @@
 import pygame
 import random
 import time
-import json
-import os
-from datetime import datetime
+from data_manager import DataManager
 
 class DigitSpanTest:
     def __init__(self, screen, font):
@@ -22,7 +20,7 @@ class DigitSpanTest:
         self.GRAY = (128, 128, 128)
 
         # Test parameters
-        self.current_span = 3  # Start with 3 digits
+        self.current_span = 4  # Start with 4 digits
         self.max_span = 9
         self.trials_per_span = 2
         self.current_trial = 0
@@ -352,19 +350,9 @@ class DigitSpanTest:
 
     def save_data(self, score):
         """Save test results to JSON file"""
-        # Create data directory if it doesn't exist
-        data_dir = "data"
-        os.makedirs(data_dir, exist_ok=True)
-
-        # Create filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"digit_span_{timestamp}.json"
-        filepath = os.path.join(data_dir, filename)
-
         # Prepare data
         data = {
             "test_type": "digit_span",
-            "timestamp": datetime.now().isoformat(),
             "forward_span": score['forward_span'],
             "backward_span": score['backward_span'],
             "total_span": score['total_span'],
@@ -372,11 +360,13 @@ class DigitSpanTest:
             "backward_trials": self.results['backward_trials']
         }
 
-        # Save to file
-        with open(filepath, 'w') as f:
-            json.dump(data, f, indent=2)
-
-        print(f"Digit span data saved to {filepath}")
+        # Save to file using DataManager
+        try:
+            data_manager = DataManager()
+            filepath = data_manager.save_test_data('digit_span', data)
+            print(f"Digit span data saved to {filepath}")
+        except Exception as e:
+            print(f"Error saving digit span data: {e}")
 
 def run_digit_span(screen, font):
     digit_span = DigitSpanTest(screen, font)

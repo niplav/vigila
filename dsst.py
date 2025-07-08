@@ -1,9 +1,7 @@
 import pygame
 import random
 import time
-import json
-import os
-from datetime import datetime
+from data_manager import DataManager
 
 class DigitSymbolSubstitutionTest:
     def __init__(self, screen, font):
@@ -224,19 +222,9 @@ class DigitSymbolSubstitutionTest:
         }
 
     def save_data(self, score):
-        # Create data directory if it doesn't exist
-        data_dir = "data"
-        os.makedirs(data_dir, exist_ok=True)
-
-        # Create filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"dsst_{timestamp}.json"
-        filepath = os.path.join(data_dir, filename)
-
         # Prepare data
         data = {
             "test_type": "digit_symbol_substitution_test",
-            "timestamp": datetime.now().isoformat(),
             "duration_seconds": self.test_duration,
             "correct_count": score['correct_count'],
             "total_attempted": score['total_attempted'],
@@ -244,11 +232,13 @@ class DigitSymbolSubstitutionTest:
             "symbol_map": self.symbol_map
         }
 
-        # Save to file
-        with open(filepath, 'w') as f:
-            json.dump(data, f, indent=2)
-
-        print(f"DSST data saved to {filepath}")
+        # Save to file using DataManager
+        try:
+            data_manager = DataManager()
+            filepath = data_manager.save_test_data('dsst', data)
+            print(f"DSST data saved to {filepath}")
+        except Exception as e:
+            print(f"Error saving DSST data: {e}")
 
 def run_dsst(screen, font):
     dsst = DigitSymbolSubstitutionTest(screen, font)

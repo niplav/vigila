@@ -2,9 +2,7 @@ import pygame
 import random
 import time
 import sys
-import json
-import os
-from datetime import datetime
+from data_manager import DataManager
 
 class PsychomotorVigilanceTask:
     def __init__(self, screen, font):
@@ -28,7 +26,7 @@ class PsychomotorVigilanceTask:
         self.GREEN = (0, 255, 0)
 
         # Stimulus wait time (2-10 seconds)
-        self.next_stimulus_delay = random.uniform(2.0, 6.0)
+        self.next_stimulus_delay = random.uniform(1.0, 3.0)
 
     def run(self):
         clock = pygame.time.Clock()
@@ -59,7 +57,7 @@ class PsychomotorVigilanceTask:
                             # Reset for next trial
                             self.stimulus_shown = False
                             self.waiting_for_stimulus = False
-                            self.next_stimulus_delay = random.uniform(2.0, 6.0)
+                            self.next_stimulus_delay = random.uniform(1.0, 3.0)
                             self.wait_start_time = current_time
 
                         else:
@@ -75,7 +73,7 @@ class PsychomotorVigilanceTask:
 
                             # Reset wait time for this trial
                             self.wait_start_time = current_time
-                            self.next_stimulus_delay = random.uniform(2.0, 6.0)
+                            self.next_stimulus_delay = random.uniform(1.0, 3.0)
 
                     elif event.key == pygame.K_ESCAPE:
                         self.running = False
@@ -99,19 +97,9 @@ class PsychomotorVigilanceTask:
         if not self.reaction_times and not self.false_starts:
             return
 
-        # Create data directory if it doesn't exist
-        data_dir = "data"
-        os.makedirs(data_dir, exist_ok=True)
-
-        # Create filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"pvt_{timestamp}.json"
-        filepath = os.path.join(data_dir, filename)
-
         # Prepare data
         data = {
             "test_type": "psychomotor_vigilance_task",
-            "timestamp": datetime.now().isoformat(),
             "completed_trials": len(self.reaction_times),
             "false_starts": len(self.false_starts),
             "total_responses": len(self.all_responses),
@@ -128,11 +116,13 @@ class PsychomotorVigilanceTask:
                 "max_rt_ms": max(self.reaction_times)
             })
 
-        # Save to file
-        with open(filepath, 'w') as f:
-            json.dump(data, f, indent=2)
-
-        print(f"PVT data saved to {filepath}")
+        # Save to file using DataManager
+        try:
+            data_manager = DataManager()
+            filepath = data_manager.save_test_data('pvt', data)
+            print(f"PVT data saved to {filepath}")
+        except Exception as e:
+            print(f"Error saving PVT data: {e}")
 
     def draw(self):
         self.screen.fill(self.WHITE)
