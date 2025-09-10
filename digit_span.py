@@ -210,7 +210,7 @@ class DigitSpanTest:
                 if self.testing_forward:
                     # Switch to backward testing
                     self.testing_forward = False
-                    self.current_span = 3
+                    self.current_span = 4
                     self.consecutive_failures = 0
                 else:
                     # Test complete
