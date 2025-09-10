@@ -20,7 +20,7 @@ class DigitSpanTest:
         self.GRAY = (128, 128, 128)
 
         # Test parameters
-        self.current_span = 4  # Start with 4 digits
+        self.current_span = 5  # Start with 5 digits
         self.max_span = 9
         self.trials_per_span = 2
         self.current_trial = 0
@@ -39,6 +39,10 @@ class DigitSpanTest:
         self.feedback_duration = 1.5
         self.last_correct = False
         self.consecutive_failures = 0
+        
+        # New tracking fields
+        self.input_start_time = 0
+        self.input_keystrokes = []
 
         # Results tracking
         self.results = {
@@ -53,6 +57,8 @@ class DigitSpanTest:
         self.current_sequence = [random.randint(0, 9) for _ in range(self.current_span)]
         self.user_input = []
         self.sequence_index = 0
+        self.input_start_time = 0
+        self.input_keystrokes = []
 
     def run(self):
         clock = pygame.time.Clock()
@@ -80,6 +86,7 @@ class DigitSpanTest:
                         if event.key >= pygame.K_0 and event.key <= pygame.K_9:
                             digit = event.key - pygame.K_0
                             self.user_input.append(digit)
+                            self.input_keystrokes.append({'key': str(digit), 'time': current_time})
 
                             # Check if input is complete
                             if len(self.user_input) >= self.current_span:
@@ -90,8 +97,10 @@ class DigitSpanTest:
                         elif event.key == pygame.K_BACKSPACE:
                             if self.user_input:
                                 self.user_input.pop()
+                                self.input_keystrokes.append({'key': 'backspace', 'time': current_time})
 
                         elif event.key == pygame.K_RETURN:
+                            self.input_keystrokes.append({'key': 'enter', 'time': current_time})
                             if self.user_input:
                                 # Pad with zeros if needed
                                 while len(self.user_input) < self.current_span:
@@ -110,6 +119,8 @@ class DigitSpanTest:
                     self.sequence_index += 1
                     if self.sequence_index >= len(self.current_sequence):
                         self.phase = "input"
+                        self.input_start_time = current_time
+                        self.input_keystrokes = []
                     else:
                         self.digit_start_time = current_time
 
@@ -127,6 +138,8 @@ class DigitSpanTest:
 
     def check_answer(self):
         """Check if the user's answer is correct"""
+        current_time = time.time()
+        
         if self.testing_forward:
             correct_sequence = self.current_sequence
         else:
@@ -134,13 +147,18 @@ class DigitSpanTest:
 
         self.last_correct = self.user_input == correct_sequence
 
+        # Calculate input duration
+        input_duration = current_time - self.input_start_time if self.input_start_time > 0 else 0
+        
         # Record the trial
         trial_data = {
             'span': self.current_span,
             'sequence': self.current_sequence.copy(),
             'user_input': self.user_input.copy(),
             'correct': self.last_correct,
-            'forward': self.testing_forward
+            'forward': self.testing_forward,
+            'input_duration': input_duration,
+            'input_keystrokes': self.input_keystrokes.copy()
         }
 
         if self.testing_forward:
@@ -181,7 +199,7 @@ class DigitSpanTest:
                     if self.testing_forward:
                         # Switch to backward testing
                         self.testing_forward = False
-                        self.current_span = 3
+                        self.current_span = 4
                         self.consecutive_failures = 0
                     else:
                         # Test complete

@@ -27,18 +27,11 @@ class DigitSymbolSubstitutionTest:
         self.GRAY = (128, 128, 128)
         self.LIGHT_GRAY = (200, 200, 200)
 
-        # Digit-symbol pairs (1-9)
-        self.symbol_map = {
-            1: "-",
-            2: "T",
-            3: "#",
-            4: "O",
-            5: "H",
-            6: "L",
-            7: "^",
-            8: "X",
-            9: "="
-        }
+        self.symbol_map = {}
+        symbols=['-', 'T', '#', 'O', 'H', 'L', '^', 'X', '=']
+        random.shuffle(symbols)
+        for i in range(1, 10):
+            self.symbol_map[i]=symbols[i-1]
 
         # Generate first set of symbols
         self.generate_new_symbols()
