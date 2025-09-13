@@ -17,7 +17,7 @@ class DigitSymbolSubstitutionTest:
         self.current_position = 0
         self.total_completed = 0
         self.correct_count = 0
-        
+
         # New tracking for response times and error patterns
         self.response_times = []  # List of response times in seconds
         self.error_patterns = []  # List of (expected_symbol, entered_digit, correct_digit) tuples
@@ -75,15 +75,32 @@ class DigitSymbolSubstitutionTest:
                     elif event.key >= pygame.K_1 and event.key <= pygame.K_9:
                         digit_key = event.key - pygame.K_0
                         if digit_key in self.symbol_map and self.current_position < 6:
+                            # Record response time
+                            response_time = time.time() - self.symbol_start_time
+                            self.response_times.append(response_time)
+
                             # Record the response
                             self.current_responses[self.current_position] = digit_key
 
-                            # Check if correct
+                            # Check if correct and track error patterns
                             current_symbol = self.current_symbols[self.current_position]
+                            correct_digit = None
+                            for d, s in self.symbol_map.items():
+                                if s == current_symbol:
+                                    correct_digit = d
+                                    break
+
                             if self.symbol_map[digit_key] == current_symbol:
                                 self.correct_count += 1
+                            else:
+                                # Record error pattern: (expected_symbol, entered_digit, correct_digit)
+                                self.error_patterns.append((current_symbol, digit_key, correct_digit))
 
                             self.current_position += 1
+
+                            # Start timing for next symbol (if not at end)
+                            if self.current_position < 6:
+                                self.symbol_start_time = time.time()
 
                             # If all 6 are filled, generate new symbols
                             if self.current_position >= 6:
@@ -95,6 +112,16 @@ class DigitSymbolSubstitutionTest:
                         if self.current_position > 0:
                             self.current_position -= 1
                             self.current_responses[self.current_position] = None
+                            # Remove the last response time and error pattern if they exist
+                            if self.response_times:
+                                self.response_times.pop()
+                            if self.error_patterns and len(self.error_patterns) > 0:
+                                # Check if the last error was for this position
+                                last_error = self.error_patterns[-1]
+                                if len(self.error_patterns) > len([r for r in self.current_responses[:self.current_position+1] if r is not None]):
+                                    self.error_patterns.pop()
+                            # Restart timing for current symbol
+                            self.symbol_start_time = time.time()
 
             self.draw(elapsed_time)
             pygame.display.flip()
@@ -214,14 +241,47 @@ class DigitSymbolSubstitutionTest:
         }
 
     def save_data(self, score):
-        # Prepare data
+        # Calculate response time statistics
+        response_time_stats = {}
+        if self.response_times:
+            response_time_stats = {
+                "mean_response_time": sum(self.response_times) / len(self.response_times),
+                "min_response_time": min(self.response_times),
+                "max_response_time": max(self.response_times),
+                "total_responses": len(self.response_times)
+            }
+
+        # Analyze error patterns
+        error_analysis = {}
+        if self.error_patterns:
+            # Count frequency of each type of error
+            symbol_confusion_matrix = {}
+            for expected_symbol, entered_digit, correct_digit in self.error_patterns:
+                key = f"{expected_symbol}→{entered_digit}"
+                if key not in symbol_confusion_matrix:
+                    symbol_confusion_matrix[key] = 0
+                symbol_confusion_matrix[key] += 1
+
+            error_analysis = {
+                "total_errors": len(self.error_patterns),
+                "symbol_confusion_matrix": symbol_confusion_matrix,
+                "most_confused_symbols": sorted(symbol_confusion_matrix.items(),
+                                              key=lambda x: x[1], reverse=True)[:5]
+            }
+
+        # Prepare data (backwards compatible - new fields are optional)
         data = {
             "test_type": "digit_symbol_substitution_test",
             "duration_seconds": self.test_duration,
             "correct_count": score['correct_count'],
             "total_attempted": score['total_attempted'],
             "accuracy": score['accuracy'],
-            "symbol_map": self.symbol_map
+            "symbol_map": self.symbol_map,
+            # New optional fields for enhanced analysis
+            "response_times": self.response_times,
+            "response_time_stats": response_time_stats,
+            "error_patterns": self.error_patterns,
+            "error_analysis": error_analysis
         }
 
         # Save to file using DataManager
