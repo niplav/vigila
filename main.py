@@ -168,7 +168,11 @@ def main():
                         print("Starting Psychomotor Vigilance Task...")
                         reaction_times = run_pvt(screen, font)
                         print(f"PVT completed. Reaction times: {reaction_times}")
-                        print(f"Average reaction time: {sum(reaction_times)/len(reaction_times):.1f}ms" if reaction_times else "No data collected")
+                        if reaction_times:
+                            avg_rt = sum(reaction_times) / len(reaction_times)
+                            print(f"Average reaction time: {avg_rt:.1f}ms")
+                        else:
+                            print("No data collected")
 
                     elif dsst_button_rect.collidepoint(mouse_pos):
                         print("Starting Digit Symbol Substitution Test...")

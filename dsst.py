@@ -22,6 +22,7 @@ class DigitSymbolSubstitutionTest:
         self.response_times = []  # List of response times in seconds
         self.error_patterns = []  # List of (expected_symbol, entered_digit, correct_digit) tuples
         self.symbol_start_time = None  # Time when current symbol was presented
+        self.response_count = 0  # Total responses recorded (for backspace tracking)
 
         # Colors
         self.WHITE = (255, 255, 255)
@@ -78,6 +79,7 @@ class DigitSymbolSubstitutionTest:
                             # Record response time
                             response_time = time.time() - self.symbol_start_time
                             self.response_times.append(response_time)
+                            self.response_count += 1
 
                             # Record the response
                             self.current_responses[self.current_position] = digit_key
@@ -111,15 +113,29 @@ class DigitSymbolSubstitutionTest:
                     elif event.key == pygame.K_BACKSPACE:
                         if self.current_position > 0:
                             self.current_position -= 1
-                            self.current_responses[self.current_position] = None
-                            # Remove the last response time and error pattern if they exist
-                            if self.response_times:
-                                self.response_times.pop()
-                            if self.error_patterns and len(self.error_patterns) > 0:
-                                # Check if the last error was for this position
-                                last_error = self.error_patterns[-1]
-                                if len(self.error_patterns) > len([r for r in self.current_responses[:self.current_position+1] if r is not None]):
-                                    self.error_patterns.pop()
+
+                            # Only remove data if there was actually a response at this position
+                            if self.current_responses[self.current_position] is not None:
+                                # Check if it was correct before removing
+                                current_symbol = self.current_symbols[self.current_position]
+                                was_correct = (self.symbol_map[self.current_responses[self.current_position]] == current_symbol)
+
+                                # Clear the response
+                                self.current_responses[self.current_position] = None
+
+                                # Remove the corresponding response time
+                                if self.response_times and self.response_count > 0:
+                                    self.response_times.pop()
+                                    self.response_count -= 1
+
+                                # Adjust correct count if this was correct
+                                if was_correct:
+                                    self.correct_count -= 1
+                                else:
+                                    # Remove the corresponding error pattern
+                                    if self.error_patterns:
+                                        self.error_patterns.pop()
+
                             # Restart timing for current symbol
                             self.symbol_start_time = time.time()
 
