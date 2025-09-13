@@ -17,6 +17,11 @@ class DigitSymbolSubstitutionTest:
         self.current_position = 0
         self.total_completed = 0
         self.correct_count = 0
+        
+        # New tracking for response times and error patterns
+        self.response_times = []  # List of response times in seconds
+        self.error_patterns = []  # List of (expected_symbol, entered_digit, correct_digit) tuples
+        self.symbol_start_time = None  # Time when current symbol was presented
 
         # Colors
         self.WHITE = (255, 255, 255)
@@ -41,6 +46,7 @@ class DigitSymbolSubstitutionTest:
         self.current_symbols = [self.symbol_map[random.randint(1, 9)] for _ in range(6)]
         self.current_responses = [None] * 6
         self.current_position = 0
+        self.symbol_start_time = time.time()  # Start timing for first symbol
 
     def run(self):
         clock = pygame.time.Clock()
@@ -199,13 +205,6 @@ class DigitSymbolSubstitutionTest:
             self.screen.blit(text, text_rect)
 
     def calculate_score(self):
-        # Add any remaining responses from current round
-        for i in range(self.current_position):
-            if self.current_responses[i] is not None:
-                current_symbol = self.current_symbols[i]
-                if self.symbol_map[self.current_responses[i]] == current_symbol:
-                    self.correct_count += 1
-
         total_attempted = self.total_completed + self.current_position
 
         return {
