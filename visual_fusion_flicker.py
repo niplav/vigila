@@ -1,5 +1,6 @@
 import pygame
 import time
+import math
 from data_manager import DataManager
 
 class VisualFusionFlickerTest:
@@ -33,8 +34,7 @@ class VisualFusionFlickerTest:
         # State management
         self.state = 'instructions'  # instructions, flickering, result, rest
         self.trial_start_time = None
-        self.flicker_timer = 0
-        self.flicker_state = False  # False = black, True = white
+        self.flicker_time = 0  # Continuous time for sinusoidal flicker
         self.detected_frequency = None
         self.detection_time = None
 
@@ -61,8 +61,7 @@ class VisualFusionFlickerTest:
                             self.state = 'flickering'
                             self.trial_start_time = current_time
                             self.current_frequency = self.start_frequency
-                            self.flicker_timer = 0
-                            self.flicker_state = False
+                            self.flicker_time = 0
 
                         elif self.state == 'flickering':
                             # User detected fusion
@@ -110,12 +109,8 @@ class VisualFusionFlickerTest:
                     self.max_frequency
                 )
 
-                # Update flicker state based on frequency
-                self.flicker_timer += dt
-                flicker_period = 1.0 / self.current_frequency
-                if self.flicker_timer >= flicker_period:
-                    self.flicker_state = not self.flicker_state
-                    self.flicker_timer = 0
+                # Update continuous flicker time for sinusoidal modulation
+                self.flicker_time += dt
 
                 # Auto-end if we reach max frequency
                 if self.current_frequency >= self.max_frequency:
@@ -240,20 +235,19 @@ class VisualFusionFlickerTest:
             self.screen.blit(start_text, start_rect)
 
         elif self.state == 'flickering':
-            # Draw flickering square
+            # Draw flickering square with sinusoidal brightness
             square_size = 300
             square_rect = pygame.Rect(0, 0, square_size, square_size)
             square_rect.center = (center_x, center_y - 30)
 
-            square_color = self.WHITE if self.flicker_state else self.BLACK
+            # Calculate sinusoidal brightness (0 to 1)
+            brightness = (math.sin(2 * math.pi * self.current_frequency * self.flicker_time) + 1) / 2
+            # Convert to grayscale color (0-255)
+            gray_value = int(brightness * 255)
+            square_color = (gray_value, gray_value, gray_value)
+
             pygame.draw.rect(self.screen, square_color, square_rect)
             pygame.draw.rect(self.screen, self.GRAY, square_rect, 2)  # Border
-
-            # Show current frequency
-            freq_text = self.font.render(f"Frequency: {self.current_frequency:.1f} Hz", True, self.BLACK)
-            freq_rect = freq_text.get_rect()
-            freq_rect.center = (center_x, center_y + 180)
-            self.screen.blit(freq_text, freq_rect)
 
             # Instructions
             instruction = self.small_font.render("Press SPACE when it looks SOLID", True, self.BLACK)

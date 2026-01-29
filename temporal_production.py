@@ -19,7 +19,7 @@ class TemporalProductionTest:
 
         # Test parameters
         self.durations = [30, 60, 90]
-        self.trials_per_duration = 5
+        self.trials_per_duration = 2
         self.trial_list = []
         self.current_trial = 0
         self.results = []
@@ -191,11 +191,12 @@ class TemporalProductionTest:
         center_y = self.screen.get_height() // 2
 
         if self.state == 'instructions':
-            # Show instructions
-            target_text = self.large_font.render(f"Target: {self.trial_list[self.current_trial]} seconds", True, self.BLUE)
-            target_rect = target_text.get_rect()
-            target_rect.center = (center_x, center_y - 60)
-            self.screen.blit(target_text, target_rect)
+            # Show instructions (only if there are trials remaining)
+            if self.current_trial < len(self.trial_list):
+                target_text = self.large_font.render(f"Target: {self.trial_list[self.current_trial]} seconds", True, self.BLUE)
+                target_rect = target_text.get_rect()
+                target_rect.center = (center_x, center_y - 60)
+                self.screen.blit(target_text, target_rect)
 
             instruction1 = self.font.render("Press SPACE to START", True, self.BLACK)
             instruction1_rect = instruction1.get_rect()

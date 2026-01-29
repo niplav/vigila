@@ -337,12 +337,6 @@ class AudioFusionFlickerTest:
             tone_rect.center = indicator_rect.center
             self.screen.blit(tone_text, tone_rect)
 
-            # Show current frequency
-            freq_text = self.font.render(f"Frequency: {self.current_frequency:.1f} Hz", True, self.BLACK)
-            freq_rect = freq_text.get_rect()
-            freq_rect.center = (center_x, center_y + 150)
-            self.screen.blit(freq_text, freq_rect)
-
             # Instructions
             instruction = self.small_font.render("Press SPACE when it sounds CONTINUOUS", True, self.BLACK)
             instruction_rect = instruction.get_rect()

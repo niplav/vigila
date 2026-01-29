@@ -20,7 +20,7 @@ class SimultaneousTemporalTest:
 
         # Test parameters
         self.num_trials = 4  # 4 trials instead of 3-5
-        self.target_duration = 60  # Always 60 seconds
+        self.target_duration = 30  # Always 30 seconds
         self.current_trial = 0
         self.results = []
 
@@ -69,7 +69,7 @@ class SimultaneousTemporalTest:
                             self._start_trial()
 
                         elif self.state == 'dual_task':
-                            # User signals 60s elapsed
+                            # User signals 30s elapsed
                             self.trial_end_time = current_time
                             elapsed_time = self.trial_end_time - self.trial_start_time
                             time_error = elapsed_time - self.target_duration
@@ -247,7 +247,7 @@ class SimultaneousTemporalTest:
             instruction1_rect.center = (center_x, center_y - 100)
             self.screen.blit(instruction1, instruction1_rect)
 
-            instruction2 = self.font.render("1. Estimate when 60 seconds have passed", True, self.BLACK)
+            instruction2 = self.font.render("1. Estimate when 30 seconds have passed", True, self.BLACK)
             instruction2_rect = instruction2.get_rect()
             instruction2_rect.center = (center_x, center_y - 30)
             self.screen.blit(instruction2, instruction2_rect)
@@ -262,7 +262,7 @@ class SimultaneousTemporalTest:
             instruction4_rect.center = (center_x, center_y + 60)
             self.screen.blit(instruction4, instruction4_rect)
 
-            instruction5 = self.small_font.render("Press SPACE when you think 60 seconds have elapsed", True, self.BLUE)
+            instruction5 = self.small_font.render("Press SPACE when you think 30 seconds have elapsed", True, self.BLUE)
             instruction5_rect = instruction5.get_rect()
             instruction5_rect.center = (center_x, center_y + 90)
             self.screen.blit(instruction5, instruction5_rect)
@@ -314,7 +314,7 @@ class SimultaneousTemporalTest:
                 self.screen.blit(result_text, result_rect)
 
             # Instruction
-            instruction = self.small_font.render("Press SPACE when 60 seconds have elapsed", True, self.BLUE)
+            instruction = self.small_font.render("Press SPACE when 30 seconds have elapsed", True, self.BLUE)
             instruction_rect = instruction.get_rect()
             instruction_rect.center = (center_x, self.screen.get_height() - 60)
             self.screen.blit(instruction, instruction_rect)
