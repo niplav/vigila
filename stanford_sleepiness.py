@@ -53,13 +53,6 @@ class StanfordSleepinessScale:
                         self.running = False
                         return rating
 
-                    # Handle return key
-                    elif event.key == pygame.K_RETURN:
-                        if self.selected_rating is not None:
-                            self.save_data(self.selected_rating)
-                            self.running = False
-                            return self.selected_rating
-
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:  # Left mouse button
                         mouse_pos = pygame.mouse.get_pos()

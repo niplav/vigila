@@ -209,10 +209,14 @@ class TemporalProductionTest:
             self.screen.blit(instruction2, instruction2_rect)
 
         elif self.state == 'timing':
-            # Blank screen with minimal info
-            timing_text = self.font.render("Timing...", True, self.BLUE)
+            target_reminder = self.large_font.render(f"{self.target_duration}s", True, self.BLUE)
+            target_reminder_rect = target_reminder.get_rect()
+            target_reminder_rect.center = (center_x, center_y - 30)
+            self.screen.blit(target_reminder, target_reminder_rect)
+
+            timing_text = self.font.render("Timing...", True, self.BLACK)
             timing_rect = timing_text.get_rect()
-            timing_rect.center = (center_x, center_y)
+            timing_rect.center = (center_x, center_y + 20)
             self.screen.blit(timing_text, timing_rect)
 
             instruction = self.small_font.render("Press SPACE when you think the time is up", True, self.BLACK)

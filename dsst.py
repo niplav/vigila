@@ -65,12 +65,12 @@ class DigitSymbolSubstitutionTest:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
-                    return self.calculate_score()
+                    break
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
-                        return self.calculate_score()
+                        break
 
                     # Handle digit input
                     elif event.key >= pygame.K_1 and event.key <= pygame.K_9:
@@ -161,7 +161,7 @@ class DigitSymbolSubstitutionTest:
         time_left = max(0, self.test_duration - elapsed_time)
         time_text = self.font.render(f"Time: {time_left:.1f}s", True, self.BLACK)
         time_rect = time_text.get_rect()
-        time_rect.x = self.screen.get_width() - 120
+        time_rect.right = self.screen.get_width() - 20
         time_rect.y = 10
         self.screen.blit(time_text, time_rect)
 
@@ -257,6 +257,10 @@ class DigitSymbolSubstitutionTest:
         }
 
     def save_data(self, score):
+        # Nothing was attempted (e.g. aborted immediately) - don't write an empty record
+        if score['total_attempted'] == 0:
+            return
+
         # Calculate response time statistics
         response_time_stats = {}
         if self.response_times:

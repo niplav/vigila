@@ -69,12 +69,12 @@ class DigitSpanTest:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
-                    return self.calculate_final_score()
+                    break
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         self.running = False
-                        return self.calculate_final_score()
+                        break
 
                     elif self.phase == "instructions":
                         if event.key == pygame.K_SPACE:
@@ -242,7 +242,7 @@ class DigitSpanTest:
         # Scores
         score_text = self.small_font.render(f"Forward: {self.forward_span} | Backward: {self.backward_span}", True, self.BLACK)
         score_rect = score_text.get_rect()
-        score_rect.x = self.screen.get_width() - 200
+        score_rect.right = self.screen.get_width() - 20
         score_rect.y = 20
         self.screen.blit(score_text, score_rect)
 
@@ -250,23 +250,27 @@ class DigitSpanTest:
         center_y = self.screen.get_height() // 2
 
         if self.phase == "instructions":
-            instructions = [
-                "You will see a sequence of digits.",
-                "Remember them in order.",
-                ""
-            ]
+            order = "SAME" if self.testing_forward else "REVERSE"
+            done = self.results['forward_trials'] if self.testing_forward else self.results['backward_trials']
 
-            if self.testing_forward:
-                instructions.append("Type them back in the SAME order.")
+            if done:
+                # Already briefed for this direction - just a short reminder
+                instructions = [
+                    f"Type them back in {order} order.",
+                    "",
+                    "Press SPACE to start"
+                ]
             else:
-                instructions.append("Type them back in REVERSE order.")
-
-            instructions.extend([
-                "",
-                "Press SPACE to start",
-                "BACKSPACE to delete, ENTER to submit",
-                "ESC to quit"
-            ])
+                instructions = [
+                    "You will see a sequence of digits.",
+                    "Remember them in order.",
+                    "",
+                    f"Type them back in the {order} order.",
+                    "",
+                    "Press SPACE to start",
+                    "BACKSPACE to delete, ENTER to submit",
+                    "ESC to quit"
+                ]
 
             for i, instruction in enumerate(instructions):
                 text = self.font.render(instruction, True, self.BLACK)
@@ -368,6 +372,10 @@ class DigitSpanTest:
 
     def save_data(self, score):
         """Save test results to JSON file"""
+        # No trials completed (e.g. aborted immediately) - don't write an empty record
+        if not self.results['forward_trials'] and not self.results['backward_trials']:
+            return
+
         # Prepare data
         data = {
             "test_type": "digit_span",

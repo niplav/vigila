@@ -1,5 +1,12 @@
-import pygame
+import os
 import sys
+
+# Ask SDL to sync flips to the display refresh. The frame-locked stimuli in the
+# flicker and brief-detection tests are only accurate if this takes effect;
+# without it flip() returns immediately and frame counts mean nothing.
+os.environ.setdefault("SDL_RENDER_VSYNC", "1")
+
+import pygame
 from data_manager import DataManager
 from pvt import run_pvt
 from dsst import run_dsst
@@ -12,6 +19,7 @@ from temporal_reproduction import run_temporal_reproduction
 from visual_fusion_flicker import run_visual_fusion_flicker
 from audio_fusion_flicker import run_audio_fusion_flicker
 from simultaneous_temporal import run_simultaneous_temporal
+from brief_stimulus_detection import run_brief_stimulus_detection
 
 # Initialize pygame
 pygame.init()
@@ -22,293 +30,324 @@ SCREEN_HEIGHT = 600
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 BLUE = (70, 130, 180)
+LIGHT_BLUE = (100, 165, 215)
 GRAY = (128, 128, 128)
 RED = (220, 20, 60)
+LIGHT_RED = (240, 60, 90)
 
 # Create the display
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), vsync=1)
 pygame.display.set_caption("Orexin Data Collection Tool")
 
 # Font
 font = pygame.font.Font(None, 36)
 title_font = pygame.font.Font(None, 48)
+small_font = pygame.font.Font(None, 24)
 
-def draw_button(surface, text, x, y, width, height, color, text_color):
-    """Draw a button with text"""
-    pygame.draw.rect(surface, color, (x, y, width, height))
-    pygame.draw.rect(surface, BLACK, (x, y, width, height), 2)
-
-    text_surface = font.render(text, True, text_color)
-    text_rect = text_surface.get_rect()
-    text_rect.center = (x + width // 2, y + height // 2)
-    surface.blit(text_surface, text_rect)
-
-    return pygame.Rect(x, y, width, height)
+# Progressively smaller fonts, so a long button label can be shrunk to fit
+button_fonts = [pygame.font.Font(None, size) for size in (36, 32, 28, 24, 20)]
 
 # Initialize data manager
 data_manager = DataManager()
 
-def show_error_message(screen, font, title_font, error_msg):
-    """Display error message and exit button"""
-    screen.fill((255, 255, 255))
-    
-    # Draw error title
-    error_title = title_font.render("Error", True, (255, 0, 0))
-    error_rect = error_title.get_rect()
-    error_rect.centerx = 400
-    error_rect.y = 150
-    screen.blit(error_title, error_rect)
-    
-    # Draw error message (word wrap)
-    words = error_msg.split()
+# Menu layout - 3 columns
+COLS = 3
+BUTTON_WIDTH = 165
+BUTTON_HEIGHT = 50
+BUTTON_SPACING = 20
+GRID_START_X = SCREEN_WIDTH // 2 - (COLS * BUTTON_WIDTH + (COLS - 1) * BUTTON_SPACING) // 2
+GRID_START_Y = 175
+
+def summarize_pvt(rts):
+    if not rts:
+        return ["No trials completed."]
+    valid = [rt for rt in rts if rt >= 100]
+    lines = [
+        f"Trials: {len(rts)}",
+        f"Mean RT: {sum(valid) / len(valid):.0f} ms" if valid else "Mean RT: n/a",
+        f"Fastest: {min(valid):.0f} ms    Slowest: {max(valid):.0f} ms" if valid else "",
+        f"Lapses (>500ms): {sum(1 for rt in valid if rt > 500)}",
+    ]
+    if len(valid) < len(rts):
+        lines.append(f"Anticipations (<100ms, excluded): {len(rts) - len(valid)}")
+    return [l for l in lines if l]
+
+def summarize_dsst(s):
+    return [
+        f"Correct: {s['correct_count']}/{s['total_attempted']}",
+        f"Accuracy: {s['accuracy'] * 100:.1f}%",
+    ]
+
+def summarize_digit_span(s):
+    return [
+        f"Forward span: {s['forward_span']}",
+        f"Backward span: {s['backward_span']}",
+        f"Total: {s['total_span']}",
+    ]
+
+def summarize_sss(rating):
+    return [f"Sleepiness rating: {rating}/7"]
+
+def summarize_feelings(text):
+    return [f"Recorded: {text[:60]}"]
+
+def summarize_stroop(s):
+    return [
+        f"Accuracy: {s['accuracy'] * 100:.1f}%  ({s['correct_count']}/{s['total_trials']})",
+        f"Mean RT congruent: {s['mean_rt_congruent_ms']:.0f} ms",
+        f"Mean RT incongruent: {s['mean_rt_incongruent_ms']:.0f} ms",
+        f"Stroop effect: {s['stroop_effect_ms']:+.0f} ms",
+    ]
+
+def summarize_temp_prod(s):
+    lines = [
+        f"Trials: {s['total_trials']}",
+        f"Mean absolute error: {s['mean_absolute_percent_error']:.1f}%",
+        f"Mean signed error: {s['mean_error_s']:+.1f} s",
+    ]
+    for dur, d in s['by_duration'].items():
+        lines.append(f"  {dur}: produced {d['mean_produced_s']:.1f}s (CV {d['coefficient_of_variation']:.2f})")
+    return lines
+
+def summarize_temp_repro(s):
+    return [
+        f"Trials: {s['total_trials']}",
+        f"Mean absolute error: {s['mean_absolute_error_s']:.1f} s",
+        f"Mean signed error: {s['mean_percent_error']:+.1f}%",
+        f"Slope: {s['slope_regression']:.2f}   r: {s['correlation_stimulus_reproduction']:.2f}",
+    ]
+
+def summarize_sim_temp(s):
+    return [
+        f"Trials: {s['total_trials']}",
+        f"Mean time error: {s['mean_time_error_s']:+.1f} s (target {s['target_duration_s']}s)",
+        f"Subtraction accuracy: {s['overall_subtraction_accuracy'] * 100:.1f}%",
+        f"Subtractions per trial: {s['mean_subtractions_per_trial']:.1f}",
+    ]
+
+def summarize_flicker(s):
+    lines = [
+        f"Mean threshold: {s['mean_threshold_hz']:.1f} Hz (SD {s['std_threshold_hz']:.1f})",
+        f"Valid trials: {s['valid_trials']}   Discarded: {s['discarded_trials']}",
+    ]
+    if s.get('measured_refresh_hz'):
+        lines.append(f"Display: {s['measured_refresh_hz']:.0f} Hz, "
+                     f"jitter {s['frame_jitter_ms']:.2f} ms")
+    if s.get('frequency_resolution_hz'):
+        lines.append(f"Step size at threshold: {s['frequency_resolution_hz']:.1f} Hz")
+    return lines
+
+def summarize_brief_stim(s):
     lines = []
-    current_line = ""
-    
-    for word in words:
-        test_line = current_line + word + " "
-        if font.size(test_line)[0] < 600:
-            current_line = test_line
+    for blk, d in s.get('blocks', {}).items():
+        threshold = d['estimated_threshold']
+        bound = " (lower bound)" if d.get('threshold_is_lower_bound') else ""
+        lines.append(f"{blk}: {threshold:.1f} {d['threshold_unit']}{bound}"
+                     if threshold is not None else f"{blk}: no threshold")
+        lines.append(f"  hits {d['hits']}/{d['n_signal_trials']}, "
+                     f"false alarms {d['false_alarms']}/{d['n_catch_trials']}"
+                     + (f", d'={d['d_prime']:.2f}" if d.get('d_prime') is not None else ""))
+        if d.get('threshold_is_lower_bound'):
+            lines.append(f"  staircase sat on its floor for {d['floor_pinned_trials']} trials")
+    return lines
+
+# label, shortcut key, runner, summary function
+TESTS = [
+    ("PVT", pygame.K_1, run_pvt, summarize_pvt),
+    ("DSST", pygame.K_2, run_dsst, summarize_dsst),
+    ("Digit Span", pygame.K_3, run_digit_span, summarize_digit_span),
+    ("Sleepiness", pygame.K_4, run_stanford_sleepiness_scale, summarize_sss),
+    ("Feelings", pygame.K_5, run_subjective_feelings, summarize_feelings),
+    ("Stroop", pygame.K_6, run_stroop, summarize_stroop),
+    ("Time Prod", pygame.K_7, run_temporal_production, summarize_temp_prod),
+    ("Time Repro", pygame.K_8, run_temporal_reproduction, summarize_temp_repro),
+    ("Dual Task", pygame.K_9, run_simultaneous_temporal, summarize_sim_temp),
+    ("Visual Flicker", pygame.K_v, run_visual_fusion_flicker, summarize_flicker),
+    ("Audio Flicker", pygame.K_a, run_audio_fusion_flicker, summarize_flicker),
+    ("Brief Stim", pygame.K_b, run_brief_stimulus_detection, summarize_brief_stim),
+]
+
+def button_rect(i):
+    """Screen rectangle for the i-th menu button"""
+    col = i % COLS
+    row = i // COLS
+    x = GRID_START_X + col * (BUTTON_WIDTH + BUTTON_SPACING)
+    y = GRID_START_Y + row * (BUTTON_HEIGHT + BUTTON_SPACING)
+    return pygame.Rect(x, y, BUTTON_WIDTH, BUTTON_HEIGHT)
+
+def exit_rect():
+    """Exit sits in the last column of the row below the test grid"""
+    rows = (len(TESTS) + COLS - 1) // COLS
+    x = GRID_START_X + (COLS - 1) * (BUTTON_WIDTH + BUTTON_SPACING)
+    y = GRID_START_Y + rows * (BUTTON_HEIGHT + BUTTON_SPACING)
+    return pygame.Rect(x, y, BUTTON_WIDTH, BUTTON_HEIGHT)
+
+def fit_font(text, max_width):
+    """Largest of the button fonts whose rendering of text fits max_width"""
+    for candidate in button_fonts:
+        if candidate.size(text)[0] <= max_width:
+            return candidate
+    return button_fonts[-1]
+
+def draw_button(rect, text, color, hover_color, shortcut=None):
+    """Draw a button, lightened while the mouse is over it"""
+    hovered = rect.collidepoint(pygame.mouse.get_pos())
+    pygame.draw.rect(screen, hover_color if hovered else color, rect)
+    pygame.draw.rect(screen, BLACK, rect, 3 if hovered else 2)
+
+    # Leave room on both sides for the shortcut badge so the label stays centred
+    padding = 34 if shortcut else 16
+    label_font = fit_font(text, rect.width - padding)
+    label = label_font.render(text, True, WHITE)
+    label_rect = label.get_rect()
+    label_rect.center = rect.center
+    screen.blit(label, label_rect)
+
+    if shortcut:
+        key_label = small_font.render(shortcut, True, WHITE)
+        screen.blit(key_label, (rect.x + 5, rect.y + 3))
+
+def wrap_text(text, render_font, max_width):
+    """Split text into lines that fit within max_width pixels"""
+    lines = []
+    current = ""
+    for word in text.split():
+        candidate = f"{current} {word}".strip()
+        if render_font.size(candidate)[0] <= max_width or not current:
+            current = candidate
         else:
-            if current_line:
-                lines.append(current_line.strip())
-            current_line = word + " "
-    if current_line:
-        lines.append(current_line.strip())
-    
-    y_offset = 220
+            lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines
+
+def show_message(title, lines, title_color=BLACK, button_text="OK"):
+    """Blocking screen showing a title, some lines, and a dismiss button.
+
+    Returns False if the window was closed, True otherwise.
+    """
+    clock = pygame.time.Clock()
+    dismiss = pygame.Rect(SCREEN_WIDTH // 2 - 75, SCREEN_HEIGHT - 80, 150, 50)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            elif event.type == pygame.KEYDOWN:
+                return True
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if dismiss.collidepoint(pygame.mouse.get_pos()):
+                    return True
+
+        screen.fill(WHITE)
+
+        heading = title_font.render(title, True, title_color)
+        heading_rect = heading.get_rect()
+        heading_rect.centerx = SCREEN_WIDTH // 2
+        heading_rect.y = 60
+        screen.blit(heading, heading_rect)
+
+        y = 140
+        for line in lines:
+            for wrapped in wrap_text(line, font, SCREEN_WIDTH - 80):
+                surface = font.render(wrapped, True, BLACK)
+                rect = surface.get_rect()
+                rect.centerx = SCREEN_WIDTH // 2
+                rect.y = y
+                screen.blit(surface, rect)
+                y += 34
+
+        draw_button(dismiss, button_text, GRAY, BLUE)
+
+        hint = small_font.render("Press any key to continue", True, GRAY)
+        hint_rect = hint.get_rect()
+        hint_rect.centerx = SCREEN_WIDTH // 2
+        hint_rect.y = SCREEN_HEIGHT - 25
+        screen.blit(hint, hint_rect)
+
+        pygame.display.flip()
+        clock.tick(60)
+
+def run_test(label, runner, summarize):
+    """Run one test and show its results on screen.
+
+    Returns False if the window was closed during the results screen.
+    """
+    print(f"Starting {label}...")
+    try:
+        result = runner(screen, font)
+    except Exception as e:
+        print(f"{label} failed: {e}")
+        return show_message(f"{label} failed", [str(e)], title_color=RED)
+
+    if not result:
+        print(f"{label}: no data collected")
+        return show_message(label, ["Cancelled - no data collected."], title_color=GRAY)
+
+    lines = summarize(result)
     for line in lines:
-        text_surface = font.render(line, True, (0, 0, 0))
-        text_rect = text_surface.get_rect()
-        text_rect.centerx = 400
-        text_rect.y = y_offset
-        screen.blit(text_surface, text_rect)
-        y_offset += 30
-    
-    # Draw exit button
-    exit_button_rect = pygame.Rect(325, y_offset + 30, 150, 50)
-    pygame.draw.rect(screen, (128, 128, 128), exit_button_rect)
-    pygame.draw.rect(screen, (0, 0, 0), exit_button_rect, 2)
-    
-    exit_text = font.render("Exit", True, (255, 255, 255))
-    exit_text_rect = exit_text.get_rect()
-    exit_text_rect.center = exit_button_rect.center
-    screen.blit(exit_text, exit_text_rect)
-    
+        print(f"  {line}")
+    return show_message(f"{label} complete", lines)
+
+def draw_menu():
+    screen.fill(WHITE)
+
+    title = title_font.render("Orexin Data Collection", True, BLACK)
+    title_rect = title.get_rect()
+    title_rect.centerx = SCREEN_WIDTH // 2
+    title_rect.y = 60
+    screen.blit(title, title_rect)
+
+    subtitle = font.render("Psychological Testing Suite", True, GRAY)
+    subtitle_rect = subtitle.get_rect()
+    subtitle_rect.centerx = SCREEN_WIDTH // 2
+    subtitle_rect.y = 110
+    screen.blit(subtitle, subtitle_rect)
+
+    for i, (label, key, _, _) in enumerate(TESTS):
+        draw_button(button_rect(i), label, BLUE, LIGHT_BLUE, pygame.key.name(key).upper())
+
+    draw_button(exit_rect(), "Exit", RED, LIGHT_RED, "ESC")
+
     pygame.display.flip()
-    return exit_button_rect
 
 def main():
     # Check data setup before starting
     error_msg = data_manager.check_data_setup()
     if error_msg:
-        clock = pygame.time.Clock()
-        running = True
-        
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:
-                        exit_button_rect = show_error_message(screen, font, title_font, error_msg)
-                        if exit_button_rect.collidepoint(pygame.mouse.get_pos()):
-                            running = False
-            
-            show_error_message(screen, font, title_font, error_msg)
-            clock.tick(60)
-        
+        show_message("Error", [error_msg], title_color=RED, button_text="Exit")
         pygame.quit()
         sys.exit(1)
-    
+
     clock = pygame.time.Clock()
     running = True
-
-    # Button properties - 3x4 grid
-    button_width = 165
-    button_height = 50
-    button_spacing = 20
-
-    # Calculate grid positions (3 columns, 4 rows)
-    grid_width = 3 * button_width + 2 * button_spacing
-    grid_height = 4 * button_height + 3 * button_spacing
-    grid_start_x = SCREEN_WIDTH // 2 - grid_width // 2
-    grid_start_y = SCREEN_HEIGHT // 2 - grid_height // 2 + 60
-
-    # Row 1
-    pvt_button_x = grid_start_x
-    pvt_button_y = grid_start_y
-
-    dsst_button_x = grid_start_x + button_width + button_spacing
-    dsst_button_y = grid_start_y
-
-    digit_span_button_x = grid_start_x + 2 * (button_width + button_spacing)
-    digit_span_button_y = grid_start_y
-
-    # Row 2
-    sss_button_x = grid_start_x
-    sss_button_y = grid_start_y + button_height + button_spacing
-
-    feelings_button_x = grid_start_x + button_width + button_spacing
-    feelings_button_y = grid_start_y + button_height + button_spacing
-
-    stroop_button_x = grid_start_x + 2 * (button_width + button_spacing)
-    stroop_button_y = grid_start_y + button_height + button_spacing
-
-    # Row 3
-    temp_prod_button_x = grid_start_x
-    temp_prod_button_y = grid_start_y + 2 * (button_height + button_spacing)
-
-    temp_repro_button_x = grid_start_x + button_width + button_spacing
-    temp_repro_button_y = grid_start_y + 2 * (button_height + button_spacing)
-
-    sim_temp_button_x = grid_start_x + 2 * (button_width + button_spacing)
-    sim_temp_button_y = grid_start_y + 2 * (button_height + button_spacing)
-
-    # Row 4
-    visual_flicker_button_x = grid_start_x
-    visual_flicker_button_y = grid_start_y + 3 * (button_height + button_spacing)
-
-    audio_flicker_button_x = grid_start_x + button_width + button_spacing
-    audio_flicker_button_y = grid_start_y + 3 * (button_height + button_spacing)
-
-    exit_button_x = grid_start_x + 2 * (button_width + button_spacing)
-    exit_button_y = grid_start_y + 3 * (button_height + button_spacing)
 
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left mouse button
-                    mouse_pos = pygame.mouse.get_pos()
-                    pvt_button_rect = pygame.Rect(pvt_button_x, pvt_button_y, button_width, button_height)
-                    dsst_button_rect = pygame.Rect(dsst_button_x, dsst_button_y, button_width, button_height)
-                    digit_span_button_rect = pygame.Rect(digit_span_button_x, digit_span_button_y, button_width, button_height)
-                    sss_button_rect = pygame.Rect(sss_button_x, sss_button_y, button_width, button_height)
-                    feelings_button_rect = pygame.Rect(feelings_button_x, feelings_button_y, button_width, button_height)
-                    stroop_button_rect = pygame.Rect(stroop_button_x, stroop_button_y, button_width, button_height)
-                    temp_prod_button_rect = pygame.Rect(temp_prod_button_x, temp_prod_button_y, button_width, button_height)
-                    temp_repro_button_rect = pygame.Rect(temp_repro_button_x, temp_repro_button_y, button_width, button_height)
-                    sim_temp_button_rect = pygame.Rect(sim_temp_button_x, sim_temp_button_y, button_width, button_height)
-                    visual_flicker_button_rect = pygame.Rect(visual_flicker_button_x, visual_flicker_button_y, button_width, button_height)
-                    audio_flicker_button_rect = pygame.Rect(audio_flicker_button_x, audio_flicker_button_y, button_width, button_height)
-                    exit_button_rect = pygame.Rect(exit_button_x, exit_button_y, button_width, button_height)
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
+                    running = False
+                else:
+                    for label, key, runner, summarize in TESTS:
+                        if event.key == key:
+                            running = run_test(label, runner, summarize)
+                            break
 
-                    if pvt_button_rect.collidepoint(mouse_pos):
-                        print("Starting Psychomotor Vigilance Task...")
-                        reaction_times = run_pvt(screen, font)
-                        print(f"PVT completed. Reaction times: {reaction_times}")
-                        if reaction_times:
-                            avg_rt = sum(reaction_times) / len(reaction_times)
-                            print(f"Average reaction time: {avg_rt:.1f}ms")
-                        else:
-                            print("No data collected")
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mouse_pos = pygame.mouse.get_pos()
+                if exit_rect().collidepoint(mouse_pos):
+                    running = False
+                else:
+                    for i, (label, _, runner, summarize) in enumerate(TESTS):
+                        if button_rect(i).collidepoint(mouse_pos):
+                            running = run_test(label, runner, summarize)
+                            break
 
-                    elif dsst_button_rect.collidepoint(mouse_pos):
-                        print("Starting Digit Symbol Substitution Test...")
-                        score = run_dsst(screen, font)
-                        print(f"DSST completed. Score: {score['correct_count']}/{score['total_attempted']} ({score['accuracy']*100:.1f}%)")
-
-                    elif digit_span_button_rect.collidepoint(mouse_pos):
-                        print("Starting Digit Span Test...")
-                        score = run_digit_span(screen, font)
-                        print(f"Digit Span completed. Forward: {score['forward_span']}, Backward: {score['backward_span']}, Total: {score['total_span']}")
-
-                    elif sss_button_rect.collidepoint(mouse_pos):
-                        print("Starting Stanford Sleepiness Scale...")
-                        rating = run_stanford_sleepiness_scale(screen, font)
-                        if rating:
-                            print(f"Stanford Sleepiness Scale completed. Rating: {rating}/7")
-                        else:
-                            print("Stanford Sleepiness Scale cancelled")
-
-                    elif feelings_button_rect.collidepoint(mouse_pos):
-                        print("Starting Subjective Feelings Assessment...")
-                        feeling_text = run_subjective_feelings(screen, font)
-                        if feeling_text:
-                            print(f"Subjective Feelings completed. Text: '{feeling_text}'")
-                        else:
-                            print("Subjective Feelings cancelled")
-
-                    elif stroop_button_rect.collidepoint(mouse_pos):
-                        print("Starting Stroop Test...")
-                        score = run_stroop(screen, font)
-                        if score:
-                            print(f"Stroop Test completed. Accuracy: {score['accuracy']*100:.1f}%, Stroop Effect: {score['stroop_effect_ms']:.1f}ms")
-
-                    elif temp_prod_button_rect.collidepoint(mouse_pos):
-                        print("Starting Temporal Production Test...")
-                        score = run_temporal_production(screen, font)
-                        if score:
-                            print(f"Temporal Production completed. Mean error: {score['mean_absolute_percent_error']:.1f}%")
-
-                    elif temp_repro_button_rect.collidepoint(mouse_pos):
-                        print("Starting Temporal Reproduction Test...")
-                        score = run_temporal_reproduction(screen, font)
-                        if score:
-                            print(f"Temporal Reproduction completed. Mean absolute error: {score['mean_absolute_error_s']:.1f}s")
-
-                    elif sim_temp_button_rect.collidepoint(mouse_pos):
-                        print("Starting Simultaneous Temporal Processing Test...")
-                        score = run_simultaneous_temporal(screen, font)
-                        if score:
-                            print(f"Simultaneous Temporal completed. Time error: {score['mean_time_error_s']:.1f}s, Subtraction accuracy: {score['overall_subtraction_accuracy']*100:.1f}%")
-
-                    elif visual_flicker_button_rect.collidepoint(mouse_pos):
-                        print("Starting Visual Fusion Flicker Test...")
-                        score = run_visual_fusion_flicker(screen, font)
-                        if score:
-                            print(f"Visual Fusion Flicker completed. Mean threshold: {score['mean_threshold_hz']:.1f} Hz")
-
-                    elif audio_flicker_button_rect.collidepoint(mouse_pos):
-                        print("Starting Audio Fusion Flicker Test...")
-                        score = run_audio_fusion_flicker(screen, font)
-                        if score:
-                            print(f"Audio Fusion Flicker completed. Mean threshold: {score['mean_threshold_hz']:.1f} Hz")
-
-                    elif exit_button_rect.collidepoint(mouse_pos):
-                        running = False
-
-        # Fill screen with white background
-        screen.fill(WHITE)
-
-        # Draw title
-        title_text = title_font.render("Orexin Data Collection", True, BLACK)
-        title_rect = title_text.get_rect()
-        title_rect.centerx = SCREEN_WIDTH // 2
-        title_rect.y = 150
-        screen.blit(title_text, title_rect)
-
-        # Draw subtitle
-        subtitle_text = font.render("Psychological Testing Suite", True, GRAY)
-        subtitle_rect = subtitle_text.get_rect()
-        subtitle_rect.centerx = SCREEN_WIDTH // 2
-        subtitle_rect.y = 200
-        screen.blit(subtitle_text, subtitle_rect)
-
-        # Row 1
-        draw_button(screen, "PVT", pvt_button_x, pvt_button_y, button_width, button_height, BLUE, WHITE)
-        draw_button(screen, "DSST", dsst_button_x, dsst_button_y, button_width, button_height, BLUE, WHITE)
-        draw_button(screen, "Digit Span", digit_span_button_x, digit_span_button_y, button_width, button_height, BLUE, WHITE)
-
-        # Row 2
-        draw_button(screen, "Sleepiness", sss_button_x, sss_button_y, button_width, button_height, BLUE, WHITE)
-        draw_button(screen, "Feelings", feelings_button_x, feelings_button_y, button_width, button_height, BLUE, WHITE)
-        draw_button(screen, "Stroop", stroop_button_x, stroop_button_y, button_width, button_height, BLUE, WHITE)
-
-        # Row 3
-        draw_button(screen, "Time Prod", temp_prod_button_x, temp_prod_button_y, button_width, button_height, BLUE, WHITE)
-        draw_button(screen, "Time Repro", temp_repro_button_x, temp_repro_button_y, button_width, button_height, BLUE, WHITE)
-        draw_button(screen, "Dual Task", sim_temp_button_x, sim_temp_button_y, button_width, button_height, BLUE, WHITE)
-
-        # Row 4
-        draw_button(screen, "Visual Flicker", visual_flicker_button_x, visual_flicker_button_y, button_width, button_height, BLUE, WHITE)
-        draw_button(screen, "Audio Flicker", audio_flicker_button_x, audio_flicker_button_y, button_width, button_height, BLUE, WHITE)
-        draw_button(screen, "Exit", exit_button_x, exit_button_y, button_width, button_height, RED, WHITE)
-
-        # Update display
-        pygame.display.flip()
+        draw_menu()
         clock.tick(60)
 
     pygame.quit()

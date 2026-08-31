@@ -80,8 +80,32 @@ class TemporalReproductionTest:
 
         return pygame.sndarray.make_sound(stereo)
 
+    def _abort_no_audio(self):
+        """Show the no-audio warning until the user dismisses it"""
+        clock = pygame.time.Clock()
+        waiting = True
+        while waiting:
+            for event in pygame.event.get():
+                if event.type in (pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
+                    waiting = False
+            self.draw()
+            hint = self.small_font.render("Press any key to return to the menu", True, self.BLACK)
+            hint_rect = hint.get_rect()
+            hint_rect.centerx = self.screen.get_width() // 2
+            hint_rect.y = self.screen.get_height() // 2 + 60
+            self.screen.blit(hint, hint_rect)
+            pygame.display.flip()
+            clock.tick(60)
+
     def run(self):
         clock = pygame.time.Clock()
+
+        # The whole test is an auditory stimulus; without audio there is nothing to reproduce
+        if not self.audio_available:
+            print("Temporal Reproduction: audio unavailable, aborting")
+            self._abort_no_audio()
+            return {}
+
         self.state = 'get_ready'
         self.state_start_time = time.time()
 
@@ -90,11 +114,15 @@ class TemporalReproductionTest:
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    if self.current_sound:
+                        self.current_sound.stop()
                     self.running = False
                     break
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
+                        if self.current_sound:
+                            self.current_sound.stop()
                         self.running = False
                         break
 
@@ -152,6 +180,8 @@ class TemporalReproductionTest:
             elif self.state == 'playing':
                 if current_time >= self.stimulus_end_time:
                     # Tone finished, pause briefly
+                    if self.current_sound:
+                        self.current_sound.stop()
                     self.state = 'pause'
                     self.state_start_time = current_time
 

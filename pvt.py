@@ -1,7 +1,6 @@
 import pygame
 import random
 import time
-import sys
 from data_manager import DataManager
 
 class PsychomotorVigilanceTask:
@@ -12,12 +11,16 @@ class PsychomotorVigilanceTask:
         self.reaction_times = []
         self.trial_count = 0
         self.max_trials = 10
-        self.waiting_for_stimulus = False
         self.stimulus_start_time = 0
         self.stimulus_shown = False
         self.wait_start_time = 0
         self.false_starts = []
         self.all_responses = []
+
+        # A press within 100ms of stimulus onset is an anticipation, not a reaction:
+        # simple visual RT does not go below ~150ms. Presses over 500ms are lapses.
+        self.anticipation_cutoff_ms = 100
+        self.lapse_cutoff_ms = 500
 
         # Colors
         self.WHITE = (255, 255, 255)
@@ -25,7 +28,7 @@ class PsychomotorVigilanceTask:
         self.RED = (255, 0, 0)
         self.GREEN = (0, 255, 0)
 
-        # Stimulus wait time (2-10 seconds)
+        # Inter-stimulus interval (note: shorter than the canonical PVT's 2-10s)
         self.next_stimulus_delay = random.uniform(1.0, 3.0)
 
     def run(self):
@@ -36,7 +39,7 @@ class PsychomotorVigilanceTask:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
-                    return self.reaction_times
+                    break
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
@@ -56,7 +59,6 @@ class PsychomotorVigilanceTask:
 
                             # Reset for next trial
                             self.stimulus_shown = False
-                            self.waiting_for_stimulus = False
                             self.next_stimulus_delay = random.uniform(1.0, 3.0)
                             self.wait_start_time = current_time
 
@@ -77,10 +79,10 @@ class PsychomotorVigilanceTask:
 
                     elif event.key == pygame.K_ESCAPE:
                         self.running = False
-                        return self.reaction_times
+                        break
 
             # Check if it's time to show stimulus
-            if not self.stimulus_shown and not self.waiting_for_stimulus:
+            if not self.stimulus_shown:
                 if time.time() - self.wait_start_time >= self.next_stimulus_delay:
                     self.stimulus_shown = True
                     self.stimulus_start_time = time.time()
@@ -114,6 +116,17 @@ class PsychomotorVigilanceTask:
                 "mean_rt_ms": sum(self.reaction_times) / len(self.reaction_times),
                 "min_rt_ms": min(self.reaction_times),
                 "max_rt_ms": max(self.reaction_times)
+            })
+
+            # Standard PVT scoring, kept as extra fields so the raw ones above
+            # stay comparable with previously collected sessions
+            valid = [rt for rt in self.reaction_times if rt >= self.anticipation_cutoff_ms]
+            data.update({
+                "anticipation_cutoff_ms": self.anticipation_cutoff_ms,
+                "lapse_cutoff_ms": self.lapse_cutoff_ms,
+                "anticipations": len(self.reaction_times) - len(valid),
+                "lapses": sum(1 for rt in valid if rt > self.lapse_cutoff_ms),
+                "mean_rt_ms_valid": sum(valid) / len(valid) if valid else None
             })
 
         # Save to file using DataManager

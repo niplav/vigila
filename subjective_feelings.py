@@ -1,4 +1,5 @@
 import pygame
+import re
 from data_manager import DataManager
 
 class SubjectiveFeelingsTest:
@@ -126,7 +127,7 @@ class SubjectiveFeelingsTest:
         pygame.draw.rect(self.screen, self.BLACK, self.text_box_rect, 2)
         
         # Text input with word wrapping
-        if self.input_text or self.cursor_visible:
+        if self.input_text:
             self.draw_text_with_cursor()
         else:
             # Placeholder text
@@ -135,6 +136,13 @@ class SubjectiveFeelingsTest:
             placeholder_rect.x = self.text_box_x + 10
             placeholder_rect.y = self.text_box_y + 10
             self.screen.blit(placeholder_text, placeholder_rect)
+
+            # Cursor at the start of the empty box
+            if self.cursor_visible:
+                cursor_x = self.text_box_x + 10
+                cursor_y = self.text_box_y + 10
+                pygame.draw.line(self.screen, self.BLACK, (cursor_x, cursor_y),
+                                 (cursor_x, cursor_y + self.font.get_height()), 2)
         
         # Submit button
         submit_button_rect = pygame.Rect(self.submit_button_x, self.submit_button_y, self.button_width, self.button_height)
@@ -172,48 +180,60 @@ class SubjectiveFeelingsTest:
         
         pygame.display.flip()
 
-    def draw_text_with_cursor(self):
-        """Draw text with word wrapping and cursor"""
-        words = self.input_text.split(' ')
+    def wrap_lines(self):
+        """Wrap the input to the box width, preserving whitespace verbatim.
+
+        Spaces must survive wrapping: stripping them (as word-based wrapping
+        does) means a space you just typed neither appears nor moves the cursor.
+        """
+        max_width = self.text_box_width - 20  # 20px padding
         lines = []
-        current_line = ""
-        
-        for word in words:
-            test_line = current_line + word + " "
-            text_width = self.font.size(test_line)[0]
-            
-            if text_width < self.text_box_width - 20:  # 20px padding
-                current_line = test_line
-            else:
-                if current_line:
-                    lines.append(current_line.rstrip())
-                current_line = word + " "
-        
-        if current_line:
-            lines.append(current_line.rstrip())
-        
-        # Draw text lines
-        y_offset = self.text_box_y + 10
+        current = ""
+
+        # Each chunk is a word plus the whitespace that follows it, so wrapping
+        # still happens at word boundaries without discarding the spaces
+        for chunk in re.findall(r'\S+\s*|\s+', self.input_text):
+            while self.font.size(current + chunk)[0] > max_width and current:
+                lines.append(current)
+                current = ""
+            # A single chunk too wide for the box has to break mid-word
+            while self.font.size(chunk)[0] > max_width:
+                cut = len(chunk)
+                while cut > 1 and self.font.size(chunk[:cut])[0] > max_width:
+                    cut -= 1
+                lines.append(chunk[:cut])
+                chunk = chunk[cut:]
+            current += chunk
+
+        lines.append(current)  # always keep a last line for the cursor to sit on
+        return lines
+
+    def draw_text_with_cursor(self):
+        """Draw the input text and the cursor at its end"""
+        lines = self.wrap_lines()
         line_height = self.font.get_height()
-        
-        for i, line in enumerate(lines):
-            if y_offset + line_height > self.text_box_y + self.text_box_height - 10:
-                break  # Don't overflow text box
-            
-            text_surface = self.font.render(line, True, self.BLACK)
-            self.screen.blit(text_surface, (self.text_box_x + 10, y_offset))
+        bottom = self.text_box_y + self.text_box_height - 10
+
+        # Show the tail of the text if it no longer fits in the box
+        visible_lines = max(1, (self.text_box_height - 20) // line_height)
+        lines = lines[-visible_lines:]
+
+        y_offset = self.text_box_y + 10
+        for line in lines:
+            if y_offset + line_height > bottom:
+                break
+            if line:
+                text_surface = self.font.render(line, True, self.BLACK)
+                self.screen.blit(text_surface, (self.text_box_x + 10, y_offset))
             y_offset += line_height
-        
-        # Draw cursor
-        if self.cursor_visible and len(lines) > 0:
-            last_line = lines[-1] if lines else ""
-            cursor_x = self.text_box_x + 10 + self.font.size(last_line)[0]
+
+        if self.cursor_visible:
+            cursor_x = self.text_box_x + 10 + self.font.size(lines[-1])[0]
             cursor_y = self.text_box_y + 10 + (len(lines) - 1) * line_height
-            
-            if cursor_y + line_height <= self.text_box_y + self.text_box_height - 10:
-                pygame.draw.line(self.screen, self.BLACK, 
-                               (cursor_x, cursor_y), 
-                               (cursor_x, cursor_y + line_height), 2)
+            if cursor_y + line_height <= bottom:
+                pygame.draw.line(self.screen, self.BLACK,
+                                 (cursor_x, cursor_y),
+                                 (cursor_x, cursor_y + line_height), 2)
 
     def save_data(self, feeling_text):
         """Save the subjective feelings data"""
